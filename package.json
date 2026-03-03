@@ -1,0 +1,31 @@
+{
+  "name": "agent-telegram",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node dist/index.js",
+    "dev": "tsx index.ts",
+    "build": "tsc",
+    "dry-run": "node --loader ts-node/esm index.ts --dry-run"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@google/adk": "^0.4.0",
+    "dotenv": "^17.3.1",
+    "node-cron": "^4.2.1",
+    "telegraf": "^4.16.3",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@google/adk-devtools": "^0.4.0",
+    "@types/node": "^25.3.3",
+    "@types/node-cron": "^3.0.11",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}
