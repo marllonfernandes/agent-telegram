@@ -2,29 +2,31 @@
 
 Este projeto é um agente inteligente desenvolvido com o **Google Agent Development Kit (ADK)** que identifica as principais tendências semanais em Arquitetura de Soluções, IA e QA, enviando um relatório formatado via Telegram.
 
+O projeto foi projetado para rodar como um **Cloud Run Job** na GCP, sendo disparado automaticamente pelo **Cloud Scheduler**.
+
 ## 🚀 Funcionalidades
 
 - **Curadoria Inteligente**: Utiliza o modelo Gemini para identificar tópicos quentes, resumos e links (Google/YouTube).
 - **Integração com Telegram**: Envia mensagens automaticamente para um chat privado e/ou grupo.
-- **Agendamento Automático**: Configurado para rodar toda **sexta-feira às 18:00** (Horário de Brasília).
-- **Execução Flexível**: Suporta execução manual imediata para testes.
+- **Job Nativo (GCP)**: Executa a tarefa e finaliza, economizando custos e recursos.
+- **Agendamento Serverless**: Acionado via Cloud Scheduler toda **sexta-feira às 18:00** (Horário de Brasília).
 
 ## 🛠️ Tecnologias Utilizadas
 
 - [Google ADK](https://google.github.io/adk-docs/) - Framework para agentes de IA.
 - [Telegraf](https://telegraf.js.org/) - Biblioteca para bots de Telegram.
-- [Node-cron](https://www.npmjs.com/package/node-cron) - Agendador de tarefas.
+- [Google Cloud Run Jobs](https://cloud.google.com/run/docs/create-jobs) - Infraestrutura de execução.
+- [Google Cloud Scheduler](https://cloud.google.com/scheduler) - Agendador serverless.
 - [TypeScript](https://www.typescriptlang.org/) - Linguagem principal.
 
 ## 📋 Pré-requisitos
 
-1.  **Google AI API Key**: Obtenha em [Google AI Studio](https://aistudio.google.com/app/apikey).
-2.  **Telegram Bot Token**: Crie um bot com o [@BotFather](https://t.me/botfather).
-3.  **Chat IDs**: Você precisará do seu ID de usuário e do ID do grupo. Para encontrá-los, acesse o link abaixo substituindo `<SEU_BOT_TOKEN>` pelo token do seu bot:
-    `https://api.telegram.org/bot<SEU_BOT_TOKEN>/getUpdates`
-    (Certifique-se de ter enviado uma mensagem para o bot antes de acessar o link).
+1.  **Google Cloud Project**: Projeto ativo na GCP.
+2.  **Google AI API Key**: Obtenha em [Google AI Studio](https://aistudio.google.com/app/apikey).
+3.  **Telegram Bot Token**: Crie um bot com o [@BotFather](https://t.me/botfather).
+4.  **Service Account**: Conta de serviço com permissões para rodar o Job e acessar o Vertex AI.
 
-## ⚙️ Configuração
+## ⚙️ Configuração Local
 
 1.  Clone o repositório.
 2.  Instale as dependências:
@@ -33,37 +35,61 @@ Este projeto é um agente inteligente desenvolvido com o **Google Agent Developm
     ```
 3.  Crie um arquivo `.env` baseado no `.env.example`:
     ```env
-    GEMINI_API_KEY=sua_chave_aqui
-    TELEGRAM_BOT_TOKEN=seu_token_aqui
-    TELEGRAM_CHAT_ID=seu_id_pessoal
-    TELEGRAM_GROUP_ID=id_do_grupo
+    GEMINI_API_KEY=AIza...
+    TELEGRAM_BOT_TOKEN=852...
+    TELEGRAM_CHAT_ID=123...
+    TELEGRAM_GROUP_ID=
+    GOOGLE_GENAI_USE_VERTEXAI=True
     ```
 
-## 🏃 Como Rodar
+## 🚢 Como Realizar o Deploy (GCP)
 
-### Modo Desenvolvimento (Execução Imediata)
+Para realizar o deploy e configurar o agendamento na Google Cloud Platform, utilize os comandos nativos do SDK `gcloud`.
 
-Para testar o agente agora mesmo sem esperar pela sexta-feira:
+### 1. Build e Deploy do Job
+
+Este comando compila o código localmente (usando o `Dockerfile`), envia os arquivos para o Cloud Build e cria/atualiza o Job no Cloud Run:
 
 ```bash
-npm run dev -- --now
+# Compile o projeto
+npm run build
+
+# Deploy do Job
+gcloud run jobs deploy agent-telegram \
+    --source . \
+    --project=seu-projeto-id \
+    --region=us-central1 \
+    --service-account=sua-sa@seu-projeto-id.iam.gserviceaccount.com \
+    --set-env-vars="GEMINI_API_KEY=sua_chave,TELEGRAM_BOT_TOKEN=seu_token,TELEGRAM_CHAT_ID=seu_id,GOOGLE_GENAI_USE_VERTEXAI=True,GOOGLE_CLOUD_PROJECT=seu-projeto-id,GOOGLE_CLOUD_LOCATION=us-central1"
 ```
 
-### Modo Produção
+### 2. Execução Manual (Teste)
 
-1.  Compile o código:
-    ```bash
-    npm run build
-    ```
-2.  Inicie o agendador:
-    ```bash
-    npm start
-    ```
+Para testar se o Job está funcionando corretamente na nuvem:
+
+```bash
+gcloud run jobs execute agent-telegram --project=seu-projeto-id --region=us-central1
+```
+
+### 3. Configurar Agendamento Automático
+
+Para que o Job rode toda sexta-feira às 18:00, crie um job no Cloud Scheduler:
+
+```bash
+gcloud scheduler jobs create http agent-telegram-trigger \
+    --schedule="0 18 * * 5" \
+    --uri="https://us-central1-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/seu-projeto-id/jobs/agent-telegram:run" \
+    --http-method=POST \
+    --location=us-central1 \
+    --oauth-service-account-email=sua-sa@seu-projeto-id.iam.gserviceaccount.com \
+    --project=seu-projeto-id \
+    --time-zone="America/Sao_Paulo" \
+    --description="Triggers the tech curator Cloud Run Job every Friday at 18:00"
+```
 
 ## 📁 Estrutura do Projeto
 
-- `agent.ts`: Lógica do agente pesquisador e suas instruções.
+- `agent.ts`: Lógica do agente pesquisador e inlined instructions.
 - `notifier.ts`: Serviço de envio de mensagens para o Telegram.
-- `scheduler.ts`: Configuração do cron job semanal.
-- `index.ts`: Ponto de entrada da aplicação.
-- `Ultimos assuntos Tecnologia.md`: Prompt base com as regras de curadoria.
+- `index.ts`: Ponto de entrada (Job Script).
+- `Dockerfile`: Configuração do container para o Cloud Run.
